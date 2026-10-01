@@ -78,7 +78,7 @@ Provide 3-6 observations, 2-3 limitations, and 2-4 recommended_actions. Be speci
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "qwen/qwen3.6-27b",
+        model: "meta-llama/llama-4-scout-17b-16e-instruct",
         messages: [
           {
             role: "user",
