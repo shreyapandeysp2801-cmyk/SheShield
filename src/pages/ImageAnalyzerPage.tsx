@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Upload, ImageIcon, Loader2, X, FileImage } from "lucide-react";
+import { Upload, ImageIcon, Loader2, X, FileImage, Sparkles } from "lucide-react";
 import { AnalysisReport } from "@/components/AnalysisReport";
 import type { AnalysisResult } from "@/types";
 
@@ -18,6 +18,10 @@ export function ImageAnalyzerPage() {
       setError("Please upload an image file (JPEG, PNG, etc.)");
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image must be under 10MB.");
+      return;
+    }
     setError(null);
     setResult(null);
     setSelectedFile(file);
@@ -30,32 +34,45 @@ export function ImageAnalyzerPage() {
     setError(null);
     setResult(null);
 
-    await new Promise((r) => setTimeout(r, 1800));
+    try {
+      const formData = new FormData();
+      formData.append("image", selectedFile);
 
-    const mockResult: AnalysisResult = {
-      status: "needs_review",
-      summary:
-        "The image shows a scene with some visual characteristics that warrant closer inspection. The AI model has identified a few elements that could indicate editing or manipulation.",
-      observations: [
-        "Lighting on the subject appears inconsistent with the surrounding environment.",
-        "Edge blending around the central figure shows possible compositing artifacts.",
-        "Background shadows do not align with the apparent light source direction.",
-        "Resolution appears slightly different between foreground and background regions.",
-      ],
-      limitations: [
-        "AI cannot determine the original source or provenance of this image.",
-        "Subtle pixel-level manipulations may not be detected by this analysis.",
-        "The model cannot distinguish between a low-quality photo and a deliberate edit.",
-      ],
-      recommended_actions: [
-        "Compare this image with official or original sources if available.",
-        "Check image metadata (EXIF data) for signs of editing software usage.",
-        "Use reverse image search to find the original or similar versions.",
-      ],
-    };
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-image`;
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: formData,
+      });
 
-    setResult(mockResult);
-    setLoading(false);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Analysis failed (${response.status})`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const analysisResult: AnalysisResult = {
+        status: data.status || "needs_review",
+        summary: data.summary || "Analysis completed.",
+        observations: Array.isArray(data.observations) ? data.observations : [],
+        limitations: Array.isArray(data.limitations) ? data.limitations : [],
+        recommended_actions: Array.isArray(data.recommended_actions) ? data.recommended_actions : [],
+      };
+
+      setResult(analysisResult);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Something went wrong during analysis.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -69,8 +86,8 @@ export function ImageAnalyzerPage() {
     <div className="space-y-5">
       <PageHeader
         icon={ImageIcon}
-        title="Image Analyzer"
-        subtitle="Upload an image to check for manipulation, deepfakes, or suspicious edits."
+        title="AI Image Detector"
+        subtitle="Upload an image to find out whether it's AI-generated or a real photograph."
       />
 
       {!selectedFile ? (
@@ -115,7 +132,7 @@ export function ImageAnalyzerPage() {
                 </>
               ) : (
                 <>
-                  <ImageIcon className="w-5 h-5" /> Analyze Image
+                  <Sparkles className="w-5 h-5" /> Detect AI Image
                 </>
               )}
             </button>
@@ -134,7 +151,7 @@ export function ImageAnalyzerPage() {
       {!result && !loading && !selectedFile && (
         <div className="rounded-2xl bg-ink-800/30 border border-ink-700 p-4">
           <p className="text-xs text-ink-400 leading-relaxed">
-            This tool sends your image to an AI vision model that looks for signs of manipulation — inconsistent lighting, compositing artifacts, resolution mismatches, and more. Results are advisory and shown with limitations.
+            This tool sends your image to an AI vision model that examines it for signs of AI generation — unnatural textures, inconsistent lighting, warped details, and other artifacts. Results are advisory and shown with limitations.
           </p>
         </div>
       )}
