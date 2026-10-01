@@ -12,10 +12,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
+    const API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!API_KEY) {
       return new Response(
-        JSON.stringify({ error: "OpenAI API key is not configured on the server." }),
+        JSON.stringify({ error: "API key is not configured on the server." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -53,9 +53,9 @@ Respond with ONLY a valid JSON object (no markdown, no code fences) in this exac
   "is_ai_generated": true | false,
   "confidence": "high" | "medium" | "low",
   "summary": "A 2-3 sentence overall assessment of whether this image appears AI-generated or real.",
-  "observations": ["Specific finding 1", "Specific finding 2", ...],
-  "limitations": ["What the analysis cannot determine", ...],
-  "recommended_actions": ["What the user should do next", ...]
+  "observations": ["Specific finding 1", "Specific finding 2"],
+  "limitations": ["What the analysis cannot determine"],
+  "recommended_actions": ["What the user should do next"]
 }
 
 Guidelines for status:
@@ -65,14 +65,14 @@ Guidelines for status:
 
 Provide 3-6 observations, 2-3 limitations, and 2-4 recommended_actions. Be specific and technical in observations.`;
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const apiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "qwen/qwen3.6-27b",
         messages: [
           {
             role: "user",
@@ -84,19 +84,20 @@ Provide 3-6 observations, 2-3 limitations, and 2-4 recommended_actions. Be speci
         ],
         max_tokens: 1000,
         temperature: 0.2,
+        response_format: { type: "json_object" },
       }),
     });
 
-    if (!openaiResponse.ok) {
-      const errText = await openaiResponse.text();
+    if (!apiResponse.ok) {
+      const errText = await apiResponse.text();
       return new Response(
-        JSON.stringify({ error: `OpenAI API error: ${openaiResponse.status} — ${errText}` }),
+        JSON.stringify({ error: `API error: ${apiResponse.status} — ${errText}` }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const openaiData = await openaiResponse.json();
-    const content = openaiData.choices?.[0]?.message?.content;
+    const apiData = await apiResponse.json();
+    const content = apiData.choices?.[0]?.message?.content;
 
     if (!content) {
       return new Response(
