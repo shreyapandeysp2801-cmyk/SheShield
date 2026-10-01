@@ -1,192 +1,405 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
 Deno.serve(async (req: Request) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   try {
+    // ============================================================
+    // 1. GET SIGHTENGINE API CREDENTIALS
+    // ============================================================
+
     const API_USER = Deno.env.get("SIGHTENGINE_API_USER");
     const API_SECRET = Deno.env.get("SIGHTENGINE_API_SECRET");
 
     if (!API_USER || !API_SECRET) {
-      return new Response(
-        JSON.stringify({ error: "Sightengine API credentials are not configured on the server. Please add SIGHTENGINE_API_USER and SIGHTENGINE_API_SECRET as edge function secrets." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return jsonResponse(
+        {
+          error:
+            "Sightengine API credentials are not configured. Please add SIGHTENGINE_API_USER and SIGHTENGINE_API_SECRET to your Supabase Edge Function secrets.",
+        },
+        500,
       );
     }
+
+    // ============================================================
+    // 2. GET IMAGE FROM REQUEST
+    // ============================================================
 
     const formData = await req.formData();
     const imageFile = formData.get("image");
 
     if (!imageFile || !(imageFile instanceof File)) {
-      return new Response(
-        JSON.stringify({ error: "No image file provided." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return jsonResponse(
+        {
+          error: "No image file provided.",
+        },
+        400,
       );
     }
 
-    // Build multipart form for Sightengine API
+    // Check that the uploaded file is an image
+    if (!imageFile.type.startsWith("image/")) {
+      return jsonResponse(
+        {
+          error: "Please upload a valid image file.",
+        },
+        400,
+      );
+    }
+
+    // Maximum file size: 10 MB
+    if (imageFile.size > 10 * 1024 * 1024) {
+      return jsonResponse(
+        {
+          error: "Image must be smaller than 10MB.",
+        },
+        400,
+      );
+    }
+
+    // ============================================================
+    // 3. SEND IMAGE TO SIGHTENGINE
+    // ============================================================
+
     const sightengineForm = new FormData();
+
     sightengineForm.append("media", imageFile);
     sightengineForm.append("models", "genai");
     sightengineForm.append("api_user", API_USER);
     sightengineForm.append("api_secret", API_SECRET);
 
-    const apiResponse = await fetch("https://api.sightengine.com/1.0/check.json", {
-      method: "POST",
-      body: sightengineForm,
-    });
+    const apiResponse = await fetch(
+      "https://api.sightengine.com/1.0/check.json",
+      {
+        method: "POST",
+        body: sightengineForm,
+      },
+    );
+
+    // ============================================================
+    // 4. HANDLE SIGHTENGINE ERRORS
+    // ============================================================
 
     if (!apiResponse.ok) {
-      const errText = await apiResponse.text();
+      const errorText = await apiResponse.text();
+
+      console.error("Sightengine error:", errorText);
+
       let friendlyError = `Sightengine API error (${apiResponse.status})`;
 
       if (apiResponse.status === 401) {
-        friendlyError = "Invalid Sightengine API credentials. Please check your API user and secret.";
+        friendlyError =
+          "Invalid Sightengine API credentials. Please check your API user and secret.";
       } else if (apiResponse.status === 429) {
-        friendlyError = "You have reached your Sightengine API usage limit. Please check your plan or try again later.";
+        friendlyError =
+          "Sightengine API usage limit reached. Please try again later.";
       } else if (apiResponse.status === 400) {
-        friendlyError = "The image could not be processed. It may be corrupted or in an unsupported format.";
+        friendlyError =
+          "The image could not be processed. It may be corrupted or unsupported.";
       }
 
-      return new Response(
-        JSON.stringify({ error: friendlyError, details: errText }),
-        { status: apiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return jsonResponse(
+        {
+          error: friendlyError,
+        },
+        apiResponse.status,
       );
     }
 
+    // ============================================================
+    // 5. READ SIGHTENGINE RESPONSE
+    // ============================================================
+
     const data = await apiResponse.json();
 
-    // Sightengine genai response format:
-    // { type: { ai_generated: 0.95, real: 0.05 }, ... }
+    console.log(
+      "Sightengine response:",
+      JSON.stringify(data),
+    );
+
     const aiScore = data?.type?.ai_generated;
     const realScore = data?.type?.real;
 
     if (typeof aiScore !== "number") {
-      return new Response(
-        JSON.stringify({ error: "Unexpected response from Sightengine. No AI-generated score found." }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return jsonResponse(
+        {
+          error:
+            "Unexpected response from Sightengine. AI-generated score was not found.",
+        },
+        502,
       );
     }
 
+    // ============================================================
+    // 6. CONVERT SCORE TO PERCENTAGE
+    // ============================================================
+
     const aiPercentage = Math.round(aiScore * 100);
-    const realPercentage = realScore !== undefined ? Math.round(realScore * 100) : 100 - aiPercentage;
 
-    // Determine verdict: aiScore >= 0.5 = Likely AI-Generated, <= 0.3 = Likely Real, between = Uncertain
-    let verdict: "likely_ai" | "likely_real" | "uncertain";
-    let status: "safe" | "needs_review" | "danger";
+    const realPercentage =
+      typeof realScore === "number"
+        ? Math.round(realScore * 100)
+        : 100 - aiPercentage;
 
-    if (aiScore >= 0.5) {
-      verdict = "likely_ai";
-      status = "danger";
-    } else if (aiScore <= 0.3) {
+    // ============================================================
+    // 7. THREE DETECTION ZONES
+    //
+    // 0–30%   → LIKELY REAL
+    // 30–70%  → UNCERTAIN
+    // 70–100% → LIKELY AI
+    // ============================================================
+
+    let verdict:
+      | "likely_real"
+      | "uncertain"
+      | "likely_ai";
+
+    let status:
+      | "safe"
+      | "needs_review"
+      | "danger";
+
+    if (aiPercentage <= 30) {
+      // ----------------------------------------------------------
+      // ZONE 1: 0–30%
+      // ----------------------------------------------------------
+
       verdict = "likely_real";
       status = "safe";
-    } else {
+    } else if (aiPercentage < 70) {
+      // ----------------------------------------------------------
+      // ZONE 2: 30–70%
+      // ----------------------------------------------------------
+
       verdict = "uncertain";
       status = "needs_review";
-    }
-
-    // Build user-friendly summary
-    let summary: string;
-    if (verdict === "likely_ai") {
-      summary = `This image is likely AI-generated. Sightengine's detection model found a ${aiPercentage}% probability that this image was created by an AI image generator. Only ${(aiPercentage < 100 ? 100 - aiPercentage : 0)}% suggests it could be real.`;
-    } else if (verdict === "likely_real") {
-      summary = `This image appears to be a real photograph. Sightengine's detection model found only ${aiPercentage}% probability of AI generation, with ${realPercentage}% confidence that it is authentic.`;
     } else {
-      summary = `This image is uncertain. Sightengine's detection model found a ${aiPercentage}% probability of AI generation, which is not high enough to confidently classify it as either AI-generated or real.`;
+      // ----------------------------------------------------------
+      // ZONE 3: 70–100%
+      // ----------------------------------------------------------
+
+      verdict = "likely_ai";
+      status = "danger";
     }
 
-    // Build observations based on score and any sub-scores
+    // ============================================================
+    // 8. CREATE SUMMARY
+    // ============================================================
+
+    let summary: string;
+
+    if (verdict === "likely_real") {
+      summary =
+        `The image is likely real. The AI detector estimated ` +
+        `${aiPercentage}% probability of AI generation and ` +
+        `${realPercentage}% probability of being a real photograph.`;
+    } else if (verdict === "uncertain") {
+      summary =
+        `The result is uncertain. The AI detector estimated ` +
+        `${aiPercentage}% probability of AI generation. ` +
+        `This falls within the uncertain range and should be verified further.`;
+    } else {
+      summary =
+        `The image is likely AI-generated. The AI detector estimated ` +
+        `${aiPercentage}% probability of AI generation.`;
+    }
+
+    // ============================================================
+    // 9. CREATE OBSERVATIONS
+    // ============================================================
+
     const observations: string[] = [];
 
-    observations.push(`AI-generated probability: ${aiPercentage}%`);
+    observations.push(
+      `AI-generated probability: ${aiPercentage}%`,
+    );
 
-    if (realScore !== undefined) {
-      observations.push(`Real photograph probability: ${realPercentage}%`);
+    observations.push(
+      `Real photograph probability: ${realPercentage}%`,
+    );
+
+    // Zone-specific observations
+
+    if (verdict === "likely_real") {
+      observations.push(
+        "The detector did not find strong indicators associated with AI-generated imagery.",
+      );
+
+      observations.push(
+        "The result is consistent with a real photograph.",
+      );
     }
 
-    // Check for per-generator scores (Sightengine may return these)
-    const possibleGenerators = ["midjourney", "stable_diffusion", "dalle", "firefly", "gan", "stylegan", "sora", "gpt", "segedream", "seedream", "nanobanana", "imagen"];
-    const generatorScores: { name: string; score: number }[] = [];
+    if (verdict === "uncertain") {
+      observations.push(
+        "The detector found mixed or inconclusive signals.",
+      );
 
-    if (data && typeof data === "object") {
-      for (const key of Object.keys(data)) {
-        const lowerKey = key.toLowerCase().replace(/[-\s]/g, "_");
-        if (possibleGenerators.some((g) => lowerKey.includes(g)) && typeof data[key] === "number") {
-          generatorScores.push({ name: key, score: data[key] });
-        }
-      }
-    }
-
-    if (generatorScores.length > 0) {
-      generatorScores.sort((a, b) => b.score - a.score);
-      const top = generatorScores.slice(0, 3);
-      for (const g of top) {
-        const pct = Math.round(g.score * 100);
-        if (pct > 5) {
-          observations.push(`Match for ${g.name} generator: ${pct}% confidence`);
-        }
-      }
-    } else if (verdict === "likely_ai") {
-      observations.push("Specific AI generator could not be identified, but synthetic patterns were detected.");
+      observations.push(
+        "The image cannot be confidently classified as either AI-generated or real.",
+      );
     }
 
     if (verdict === "likely_ai") {
-      observations.push("The image shows patterns commonly found in AI-generated content, such as unnatural textures or artifacts.");
-    } else if (verdict === "likely_real") {
-      observations.push("No significant AI-generation markers were detected in the image.");
-    } else {
-      observations.push("Some indicators are ambiguous — the image has mixed signals that prevent a confident classification.");
+      observations.push(
+        "The detector found patterns commonly associated with AI-generated imagery.",
+      );
+
+      observations.push(
+        "The image should be treated as potentially synthetic until its original source is verified.",
+      );
     }
 
-    // Limitations
+    // ============================================================
+    // 10. LIMITATIONS
+    // ============================================================
+
     const limitations = [
-      "No AI detector is 100% accurate. Results should be treated as advisory, not definitive proof.",
-      "Heavily edited or compressed real photos may trigger false positives.",
-      "Very high-quality AI images may occasionally pass as real.",
+      "AI-image detection is probabilistic and cannot guarantee authenticity.",
+      "Image compression, resizing, screenshots, filters, and editing can affect detection accuracy.",
+      "New AI image generators may produce images that are harder to detect.",
+      "A high AI probability should be treated as an indicator rather than definitive proof.",
     ];
 
-    // Recommended actions
+    // ============================================================
+    // 11. RECOMMENDED ACTIONS
+    // ============================================================
+
     const recommended_actions: string[] = [];
-    if (verdict === "likely_ai") {
-      recommended_actions.push("Do not trust this image as evidence of a real event or person.");
-      recommended_actions.push("Try to verify the source — check if it comes from a reputable news outlet or official channel.");
-      recommended_actions.push("Use reverse image search to see if the photo appears elsewhere online.");
-    } else if (verdict === "uncertain") {
-      recommended_actions.push("Treat this image with caution until you can verify its source.");
-      recommended_actions.push("Try a reverse image search to check for the original version.");
-      recommended_actions.push("If this image involves a person you know, contact them directly to confirm.");
-    } else {
-      recommended_actions.push("This image appears genuine, but always verify the source for important decisions.");
-      recommended_actions.push("If something seems off, trust your instincts and investigate further.");
+
+    if (verdict === "likely_real") {
+      recommended_actions.push(
+        "The image does not show strong evidence of AI generation.",
+      );
+
+      recommended_actions.push(
+        "For important situations, verify the original source of the image.",
+      );
+
+      recommended_actions.push(
+        "Use reverse image search if you need additional verification.",
+      );
     }
+
+    if (verdict === "uncertain") {
+      recommended_actions.push(
+        "Treat the image cautiously until its source can be verified.",
+      );
+
+      recommended_actions.push(
+        "Look for the original source and publication date.",
+      );
+
+      recommended_actions.push(
+        "Use reverse image search to find earlier versions of the image.",
+      );
+    }
+
+    if (verdict === "likely_ai") {
+      recommended_actions.push(
+        "Treat the image as potentially AI-generated.",
+      );
+
+      recommended_actions.push(
+        "Verify the original source before trusting the image.",
+      );
+
+      recommended_actions.push(
+        "Use reverse image search to look for the original image.",
+      );
+
+      recommended_actions.push(
+        "Do not rely on the image alone as evidence of a real event or person.",
+      );
+    }
+
+    // ============================================================
+    // 12. FINAL RESULT
+    // ============================================================
 
     const result = {
       status,
       verdict,
+
+      // Percentages shown in your frontend
       ai_percentage: aiPercentage,
       real_percentage: realPercentage,
+
+      // Human-readable result
       summary,
+
+      // Detailed information
       observations,
       limitations,
       recommended_actions,
+
+      // Useful metadata
+      detector: {
+        provider: "Sightengine",
+        model: "genai",
+        ai_score: aiScore,
+        real_score:
+          typeof realScore === "number"
+            ? realScore
+            : null,
+      },
+
+      // Useful for your frontend if you want to display
+      // the three detection zones
+      detection_zone:
+        aiPercentage <= 30
+          ? "likely_real"
+          : aiPercentage < 70
+            ? "uncertain"
+            : "likely_ai",
     };
 
-    return new Response(
-      JSON.stringify(result),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse(result, 200);
+
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error occurred";
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    console.error("analyze-image error:", err);
+
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Unknown error occurred.";
+
+    return jsonResponse(
+      {
+        error: message,
+      },
+      500,
     );
   }
 });
+
+// ============================================================
+// HELPER FUNCTION
+// ============================================================
+
+function jsonResponse(
+  data: unknown,
+  status = 200,
+): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+}
