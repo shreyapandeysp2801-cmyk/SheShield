@@ -57,6 +57,7 @@ export function Navigation({ currentPage, onNavigate }: NavigationProps) {
               <Siren className="w-4 h-4" /> Call 112
             </a>
           </div>
+          <p className="text-[9px] text-ink-500 font-medium tracking-wider uppercase text-center mt-3">An initiative by The Paradigm Shift</p>
         </div>
       </nav>
 

@@ -60,6 +60,9 @@ export function ImageAnalyzerPage() {
 
       const analysisResult: AnalysisResult = {
         status: data.status || "needs_review",
+        verdict: data.verdict,
+        ai_percentage: data.ai_percentage,
+        real_percentage: data.real_percentage,
         summary: data.summary || "Analysis completed.",
         observations: Array.isArray(data.observations) ? data.observations : [],
         limitations: Array.isArray(data.limitations) ? data.limitations : [],
@@ -151,7 +154,7 @@ export function ImageAnalyzerPage() {
       {!result && !loading && !selectedFile && (
         <div className="rounded-2xl bg-ink-800/30 border border-ink-700 p-4">
           <p className="text-xs text-ink-400 leading-relaxed">
-            This tool sends your image to an AI vision model that examines it for signs of AI generation — unnatural textures, inconsistent lighting, warped details, and other artifacts. Results are advisory and shown with limitations.
+            This tool uses Sightengine's specialized AI-generated image detection model to analyze your image for synthetic patterns and artifacts. It returns a confidence score showing how likely the image is AI-generated or real.
           </p>
         </div>
       )}

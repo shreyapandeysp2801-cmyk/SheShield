@@ -22,6 +22,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
               <p className="text-xs md:text-sm text-brand-400 font-medium">Your Digital Safety Shield</p>
             </div>
           </div>
+          <p className="text-[10px] text-ink-500 font-medium tracking-wider uppercase mb-4">An initiative by The Paradigm Shift</p>
           <p className="text-sm md:text-base text-ink-300 leading-relaxed max-w-md">
             AI-powered media analysis and emergency tools to help you stay safe, verify suspicious content, and act fast in critical situations.
           </p>

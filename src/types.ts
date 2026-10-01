@@ -1,7 +1,12 @@
 export type AnalysisStatus = "safe" | "needs_review" | "danger";
 
+export type DetectionVerdict = "likely_real" | "likely_ai" | "uncertain";
+
 export interface AnalysisResult {
   status: AnalysisStatus;
+  verdict?: DetectionVerdict;
+  ai_percentage?: number;
+  real_percentage?: number;
   summary: string;
   observations: string[];
   limitations: string[];
