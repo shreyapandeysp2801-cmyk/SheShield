@@ -7,6 +7,7 @@ import { VideoAnalyzerPage } from "@/pages/VideoAnalyzerPage";
 import { EmergencyHubPage } from "@/pages/EmergencyHubPage";
 import { SimulatedCallPage } from "@/pages/SimulatedCallPage";
 import { SafetyTipsPage } from "@/pages/SafetyTipsPage";
+import { AIAssistantPage } from "@/pages/AIAssistantPage";
 import type { PageId } from "@/types";
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
           {currentPage === "emergency" && <EmergencyHubPage onNavigate={handleNavigate} />}
           {currentPage === "simulated-call" && <SimulatedCallPage />}
           {currentPage === "safety-tips" && <SafetyTipsPage />}
+          {currentPage === "ai-assistant" && <AIAssistantPage />}
         </div>
       </main>
     </div>

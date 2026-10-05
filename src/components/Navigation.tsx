@@ -1,4 +1,4 @@
-import { Home, Image, Mic, Video, Siren, Phone, Lightbulb } from "lucide-react";
+import { Home, Image, Mic, Video, Siren, Phone, Lightbulb, MessageCircle } from "lucide-react";
 import type { PageId } from "@/types";
 
 interface NavigationProps {
@@ -14,6 +14,7 @@ const navItems: { id: PageId; label: string; icon: typeof Home }[] = [
   { id: "emergency", label: "SOS", icon: Siren },
   { id: "simulated-call", label: "Fake Call", icon: Phone },
   { id: "safety-tips", label: "Tips", icon: Lightbulb },
+  { id: "ai-assistant", label: "AI Chat", icon: MessageCircle },
 ];
 
 export function Navigation({ currentPage, onNavigate }: NavigationProps) {

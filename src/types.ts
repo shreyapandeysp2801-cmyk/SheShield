@@ -20,7 +20,8 @@ export type PageId =
   | "video-analyzer"
   | "emergency"
   | "simulated-call"
-  | "safety-tips";
+  | "safety-tips"
+  | "ai-assistant";
 
 export interface SafetyTip {
   icon: string;

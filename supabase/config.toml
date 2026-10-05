@@ -1,2 +1,5 @@
 [functions.analyze-image]
 verify_jwt = true
+
+[functions.ai-chat]
+verify_jwt = true

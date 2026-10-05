@@ -1,4 +1,4 @@
-import { Shield, Siren, Image, Mic, Video, Phone, Lightbulb, ChevronRight, AlertCircle } from "lucide-react";
+import { Shield, Siren, Image, Mic, Video, Phone, Lightbulb, ChevronRight, AlertCircle, MessageCircle } from "lucide-react";
 import type { PageId } from "@/types";
 
 interface HomePageProps {
@@ -82,6 +82,12 @@ export function HomePage({ onNavigate }: HomePageProps) {
       <div>
         <h2 className="text-base font-bold text-white mb-3 px-1">Safety Tools</h2>
         <div className="space-y-3">
+          <FeatureCard
+            icon={MessageCircle}
+            title="AI Safety Assistant"
+            description="Chat with an AI assistant about digital safety, online harassment, and how to use SheShield's features."
+            onClick={() => onNavigate("ai-assistant")}
+          />
           <FeatureCard
             icon={Phone}
             title="Simulated Incoming Call"
