@@ -19,11 +19,11 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-ink-950 text-white">
+    <div className="min-h-screen bg-[#aeb8b8] text-white selection:bg-brand-400/30">
       <Navigation currentPage={currentPage} onNavigate={handleNavigate} />
 
-      <main className="md:ml-64 pb-24 md:pb-8">
-        <div className="max-w-2xl mx-auto px-4 py-6 md:px-8 md:py-8">
+      <main className={`md:ml-64 min-h-screen pb-24 md:pb-8 ${currentPage === "home" ? "bg-[#aeb8b8]" : "bg-[#090a0a]"}`}>
+        <div className="max-w-3xl mx-auto px-4 py-6 md:px-10 md:py-10">
           {currentPage === "home" && <HomePage onNavigate={handleNavigate} />}
           {currentPage === "image-analyzer" && <ImageAnalyzerPage />}
           {currentPage === "audio-analyzer" && <AudioAnalyzerPage />}

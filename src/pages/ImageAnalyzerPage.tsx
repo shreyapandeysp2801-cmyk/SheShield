@@ -86,7 +86,7 @@ export function ImageAnalyzerPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-fade-in">
       <PageHeader
         icon={ImageIcon}
         title="AI Image Detector"
@@ -96,21 +96,21 @@ export function ImageAnalyzerPage() {
       {!selectedFile ? (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="cursor-pointer border-2 border-dashed border-ink-600 hover:border-brand-500 rounded-3xl p-8 md:p-12 text-center transition-colors bg-ink-800/30"
+          className="cursor-pointer border border-white/15 hover:border-brand-400 rounded-[1.75rem] p-8 md:p-14 text-center transition-all bg-[#090a0a] hover:bg-[#111313] group"
         >
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-700/10 flex items-center justify-center mb-4">
-            <Upload className="w-8 h-8 text-brand-400" />
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-[#b7a1d8] text-[#090a0a] flex items-center justify-center mb-5 group-hover:scale-105 transition-transform">
+            <Upload className="w-8 h-8" />
           </div>
-          <p className="text-sm font-semibold text-white">Tap to upload an image</p>
-          <p className="text-xs text-ink-400 mt-1">JPEG, PNG, WebP — up to 10MB</p>
+          <p className="font-display text-base font-semibold text-white">Upload an image to scan</p>
+          <p className="text-xs text-white/45 mt-2">JPEG, PNG, WebP — up to 10MB</p>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="relative rounded-2xl overflow-hidden border border-ink-700 bg-ink-800">
+          <div className="relative rounded-[1.75rem] overflow-hidden border border-white/10 bg-[#090a0a]">
             <img src={previewUrl!} alt="Uploaded preview" className="w-full max-h-72 object-contain" />
             <button
               onClick={handleReset}
-              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-ink-900/80 backdrop-blur-sm flex items-center justify-center text-white hover:bg-brand-500 transition-colors"
+              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 backdrop-blur-sm flex items-center justify-center text-white hover:bg-brand-500 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -127,7 +127,7 @@ export function ImageAnalyzerPage() {
             <button
               onClick={handleAnalyze}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-xl transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-brand-400 hover:bg-brand-300 disabled:opacity-60 text-[#090a0a] font-bold py-4 rounded-2xl transition-all active:scale-[.99]"
             >
               {loading ? (
                 <>
@@ -152,8 +152,8 @@ export function ImageAnalyzerPage() {
       {result && <AnalysisReport result={result} />}
 
       {!result && !loading && !selectedFile && (
-        <div className="rounded-2xl bg-ink-800/30 border border-ink-700 p-4">
-          <p className="text-xs text-ink-400 leading-relaxed">
+        <div className="rounded-2xl bg-[#090a0a] border border-white/10 p-4">
+          <p className="text-xs text-white/45 leading-relaxed">
             This tool uses Sightengine's specialized AI-generated image detection model to analyze your image for synthetic patterns and artifacts. It returns a confidence score showing how likely the image is AI-generated or real.
           </p>
         </div>

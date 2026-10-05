@@ -5,17 +5,17 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#fdf2f8',
-          100: '#fce7f3',
-          200: '#fbcfe8',
-          300: '#f9a8d4',
-          400: '#f472b6',
-          500: '#ec4899',
-          600: '#db2777',
-          700: '#be185d',
-          800: '#9d174d',
-          900: '#831843',
-          950: '#500724',
+          50: '#effff9',
+          100: '#d7fff1',
+          200: '#b0f9df',
+          300: '#86f0cd',
+          400: '#63e6be',
+          500: '#35d6a5',
+          600: '#20b887',
+          700: '#168f6d',
+          800: '#126f57',
+          900: '#105a48',
+          950: '#07382e',
         },
         ink: {
           50: '#f5f5f5',
@@ -32,7 +32,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+        display: ['Space Grotesk', 'DM Sans', 'sans-serif'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
